@@ -1,0 +1,33 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ArrowRight, ClipboardPlus, Plus, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import api, { formatRupiah, formatTanggal } from '../services/api';
+import Modal from '../components/Modal';
+
+const statuses = ['pending', 'confirmed', 'picked_up', 'washing', 'ironing', 'ready', 'delivered', 'cancelled'];
+const labels = { pending: 'Menunggu konfirmasi', confirmed: 'Dikonfirmasi', picked_up: 'Dijemput kurir', washing: 'Dicuci', ironing: 'Disetrika', ready: 'Siap diambil', delivered: 'Selesai', cancelled: 'Dibatalkan' };
+const blank = { customerId: '', packageId: '', weight: '', note: '' };
+export default function Orders() {
+  const [orders, setOrders] = useState([]); const [customers, setCustomers] = useState([]); const [packages, setPackages] = useState([]); const [open, setOpen] = useState(false); const [form, setForm] = useState(blank); const [error, setError] = useState(''); const [notice, setNotice] = useState('');
+  const current = JSON.parse(localStorage.getItem('revina_user') || '{}');
+  const load = useCallback(async () => { try { const [o, c, p] = await Promise.all([api.get('/orders'), api.get('/customers'), api.get('/packages')]); setOrders(o.data); setCustomers(c.data); setPackages(p.data); } catch (err) { setError(err.response?.data?.message || 'Data transaksi tidak dapat dimuat.'); } }, []);
+  useEffect(() => { load(); }, [load]);
+  const selectedPackage = packages.find((item) => String(item.id) === String(form.packageId));
+  const total = useMemo(() => Number(selectedPackage?.pricePerKg || 0) * Number(form.weight || 0), [selectedPackage, form.weight]);
+  const create = async (event) => { event.preventDefault(); setError(''); try { await api.post('/orders', { ...form, weight: Number(form.weight) }); setOpen(false); setForm(blank); setNotice('Order berhasil dibuat.'); load(); } catch (err) { setError(err.response?.data?.message || 'Order tidak dapat dibuat.'); } };
+  const changeStatus = async (order, status) => { try { await api.patch(`/orders/${order.id}/status`, { status }); setNotice(`Status order #${order.id} diperbarui.`); load(); } catch (err) { setError(err.response?.data?.message || 'Status tidak dapat diperbarui.'); } };
+  const remove = async (order) => { if (!window.confirm(`Hapus order #${order.id}? Pembayaran terkait juga akan dihapus.`)) return; try { await api.delete(`/orders/${order.id}`); setNotice('Order berhasil dihapus.'); load(); } catch (err) { setError(err.response?.data?.message || 'Order tidak dapat dihapus.'); } };
+  return <div className="page-enter">
+    <div className="page-heading"><div><div className="eyebrow">PENERIMAAN DAN PROSES</div><h1>Transaksi order</h1><p>Kelola cucian masuk dari awal hingga siap diambil.</p></div>{['admin', 'kasir'].includes(current.role) && <button className="button button-primary" onClick={() => { setOpen(true); setError(''); }}><Plus size={17} /> Buat order</button>}</div>
+    {error && <div className="alert-error">{error}</div>}{notice && <div className="alert-success">{notice}</div>}
+    <div className="panel data-panel"><div className="panel-heading"><div><span className="eyebrow">DAFTAR TRANSAKSI</span><h2>{orders.length} order</h2></div><Link to="/track" className="text-link">Lacak order <ArrowRight size={15} /></Link></div>
+      <div className="table-scroll"><table><thead><tr><th>ID / Tanggal</th><th>Pelanggan</th><th>Paket</th><th>Berat</th><th>Total</th><th>Status</th><th>Aksi</th></tr></thead><tbody>{orders.map((order) => <tr key={order.id}><td><span className="id-cell">#{String(order.id).padStart(4, '0')}</span><small className="table-subline">{formatTanggal(order.createdAt)}</small></td><td>{order.customer?.name || '—'}</td><td>{order.package?.name || '—'}</td><td>{Number(order.weight).toLocaleString('id-ID')} kg</td><td>{formatRupiah(order.total)}</td><td><select className={`status-select status-${order.status}`} value={order.status} disabled={!['admin', 'kasir'].includes(current.role)} onChange={(event) => changeStatus(order, event.target.value)} aria-label={`Status order ${order.id}`}>{statuses.map((status) => <option key={status} value={status}>{labels[status]}</option>)}</select></td><td><div className="row-actions"><Link to={`/track?id=${order.id}`} className="icon-button" title="Lihat pelacakan" aria-label="Lihat pelacakan"><ArrowRight size={16} /></Link>{current.role === 'admin' && <button className="icon-button danger-icon" onClick={() => remove(order)} title="Hapus order" aria-label="Hapus order"><Trash2 size={16} /></button>}</div></td></tr>)}{!orders.length && <tr><td className="empty-cell" colSpan="7">Belum ada order. Buat transaksi pertama untuk mulai.</td></tr>}</tbody></table></div>
+    </div>
+    {open && <Modal title="Buat order baru" onClose={() => setOpen(false)} wide><form className="form-stack modal-form" onSubmit={create}>
+      <div className="form-grid"><label className="field-label">Pelanggan<select required value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })}><option value="">Pilih pelanggan</option>{customers.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.phone}</option>)}</select></label><label className="field-label">Paket layanan<select required value={form.packageId} onChange={(e) => setForm({ ...form, packageId: e.target.value })}><option value="">Pilih paket</option>{packages.map((item) => <option key={item.id} value={item.id}>{item.name} · {formatRupiah(item.pricePerKg)}/kg</option>)}</select></label></div>
+      <label className="field-label">Berat cucian (kg)<input type="number" min="0.1" step="0.1" required value={form.weight} onChange={(e) => setForm({ ...form, weight: e.target.value })} /></label><label className="field-label">Catatan <span className="optional-note">OPSIONAL</span><textarea rows="2" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
+      <div className="order-total-preview"><span>ESTIMASI TOTAL</span><strong>{formatRupiah(total)}</strong><small>{selectedPackage ? `${formatRupiah(selectedPackage.pricePerKg)} × ${form.weight || 0} kg` : 'Pilih paket dan masukkan berat'}</small></div>
+      {error && <div className="alert-error">{error}</div>}<div className="modal-actions"><button type="button" className="button button-quiet" onClick={() => setOpen(false)}>Batal</button><button className="button button-primary"><ClipboardPlus size={17} /> Simpan order</button></div>
+    </form></Modal>}
+  </div>;
+}

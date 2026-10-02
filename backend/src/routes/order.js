@@ -1,0 +1,17 @@
+const router = require('express').Router();
+const c = require('../controllers/orderController');
+const auth = require('../middleware/auth');
+const role = require('../middleware/role');
+const wrap = require('../middleware/asyncHandler');
+router.get('/track/:code', wrap(c.track));
+router.use(auth);
+router.get('/my-orders', role('customer'), wrap(c.getMyOrders));
+router.get('/my-orders/:id', role('customer'), wrap(c.getMyOrder));
+router.post('/customer', role('customer'), wrap(c.createCustomer));
+router.patch('/:id/cancel', role('customer'), wrap(c.cancelMyOrder));
+router.get('/', role('admin', 'kasir'), wrap(c.getAll));
+router.post('/', role('admin', 'kasir'), wrap(c.create));
+router.put('/:id', role('admin', 'kasir'), wrap(c.update));
+router.patch('/:id/status', role('admin', 'kasir'), wrap(c.updateStatus));
+router.delete('/:id', role('admin'), wrap(c.remove));
+module.exports = router;

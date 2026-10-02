@@ -1,0 +1,13 @@
+const router = require('express').Router();
+const c = require('../controllers/packageController');
+const auth = require('../middleware/auth');
+const role = require('../middleware/role');
+const wrap = require('../middleware/asyncHandler');
+router.get('/', wrap(c.getAll));
+router.get('/add-ons', wrap(c.getAddOns));
+router.get('/:id', wrap(c.getById));
+router.use(auth);
+router.post('/', role('admin'), wrap(c.create));
+router.put('/:id', role('admin'), wrap(c.update));
+router.delete('/:id', role('admin'), wrap(c.remove));
+module.exports = router;

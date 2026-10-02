@@ -1,0 +1,13 @@
+const router = require('express').Router();
+const c = require('../controllers/paymentController');
+const auth = require('../middleware/auth');
+const wrap = require('../middleware/asyncHandler');
+const upload = require('../middleware/upload');
+const role = require('../middleware/role');
+router.use(auth);
+router.get('/my-payments', role('customer'), wrap(c.myPayments));
+router.get('/', wrap(c.getAll));
+router.post('/', wrap(c.create));
+router.post('/:id/upload', upload.single('proof'), wrap(c.uploadProof));
+router.patch('/:id/status', role('admin', 'kasir'), wrap(c.updateStatus));
+module.exports = router;

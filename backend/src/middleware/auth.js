@@ -1,0 +1,14 @@
+const jwt = require('jsonwebtoken');
+require('dotenv').config();
+
+module.exports = (req, res, next) => {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) return res.status(401).json({ message: 'Silakan masuk terlebih dahulu' });
+  const token = header.slice(7);
+  try {
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch {
+    return res.status(401).json({ message: 'Token tidak valid atau sudah kedaluwarsa' });
+  }
+};

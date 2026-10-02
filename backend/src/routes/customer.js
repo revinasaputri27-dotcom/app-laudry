@@ -1,0 +1,11 @@
+const router = require('express').Router();
+const c = require('../controllers/customerController');
+const auth = require('../middleware/auth');
+const role = require('../middleware/role');
+const wrap = require('../middleware/asyncHandler');
+router.use(auth);
+router.get('/', wrap(c.getAll));
+router.post('/', role('admin', 'kasir'), wrap(c.create));
+router.put('/:id', role('admin', 'kasir'), wrap(c.update));
+router.delete('/:id', role('admin', 'kasir'), wrap(c.remove));
+module.exports = router;
